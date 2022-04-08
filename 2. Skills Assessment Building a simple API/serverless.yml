@@ -1,0 +1,88 @@
+# Welcome to Serverless!
+#
+# This file is the main config file for your service.
+# It's very minimal at this point and uses default values.
+# You can always add more config options for more control.
+# We've included some commented out config examples here.
+# Just uncomment any of them to get that config option.
+#
+# For full config options, check the docs:
+#    docs.serverless.com
+#
+# Happy Coding!
+
+service: staircase-assessment
+
+frameworkVersion: '3' 
+
+provider:
+  name: aws
+  runtime: python3.8
+  memorySize: 128
+  environment:
+    DYNAMODB_TABLENAME: staircase-dynamodb-assessment-1
+    S3_BUCKETNAME: staircase-assessment-1
+
+  iam:
+     role:
+        managedPolicies:
+          - 'arn:aws:iam::aws:policy/AWSLambda_FullAccess'
+          - 'arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess'
+          - 'arn:aws:iam::aws:policy/AmazonRekognitionFullAccess'
+          - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
+
+functions:
+  detect_labels:
+    description: Triggered when an object is created into s3 bucket and writes recognized label into dynamoDB table using blob_id like key
+    handler: handler.detect_labels
+    events:
+      - s3: 
+          bucket: ${self:provider.environment.S3_BUCKETNAME}
+          event: s3:ObjectCreated:*
+          existing: true
+  presigned_and_callback_url:
+    description: Returns presigned upload url, save callback_url into dynamoDB using blob_id like key
+    handler: handler.presigned_and_callback_url
+    events:
+      - http:
+          path: blobs
+          method: post
+  get_labels:
+    description: Retrieves recognized labels of the image using blob_id from DynamoDB table
+    handler: handler.get_labels
+    events:
+      - http:
+          path: /blobs/{blobId}
+          method: get
+  make_callback:
+    handler: handler.make_callback
+    events:
+      - stream:
+          type: dynamodb
+          arn:
+            Fn::GetAtt:
+              - ${self:provider.environment.DYNAMODB_TABLENAME}
+              - #StreamArn
+          batchSize: 1
+
+resources:
+  Resources:
+    S3Bucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:provider.environment.S3_BUCKETNAME}
+    DynamoDBTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.DYNAMODB_TABLENAME}
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        StreamSpecification:
+          StreamViewType: NEW_IMAGE

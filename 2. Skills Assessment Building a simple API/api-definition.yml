@@ -1,0 +1,113 @@
+openapi: 3.0.0
+info:
+  title: Staircase assesment
+  version: 1.0.0
+servers:
+  url: "https://nw5if1bzx3.execute-api.us-east-1.amazonaws.com/dev/blobs"
+paths:
+  /blobs:
+    post:
+      description: Returns presigned upload url, save callback_url into dynamoDB using blob_id like key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              description: callback url endpoint
+                required:
+                  - callback_url
+                properties:
+                  callback_url:
+                    description: url
+                    type: string
+                    example: http://your-callback-url
+      responses:
+        '204':
+          description: generated presigned_url and saved callback_url
+          content:
+            application/json:
+              schema:
+                description: blob_id and upload_url to call for the uploading
+                required:
+                  - blob_id
+                  - upload_url
+                properties:
+                  blob_id:
+                    description: uuid random generated
+                    type: string
+                    example: 2531329f-fb09-4ef7-887e-84e648214436
+                  upload_url:
+                    description: presigned upload url that expires after 1 hour
+                    type: string
+                    example: http://your-upload-url
+        '200':
+          description: generated presigned_url and not saved callback_url because it wasn't send
+          content:
+            application/json:
+              schema:
+                description: blob_id and upload_url to call for the uploading
+                required:
+                  - blob_id
+                  - upload_url
+                properties:
+                  blob_id:
+                    description: uuid random generated
+                    type: string
+                    example: 2531329f-fb09-4ef7-887e-84e648214436
+                  upload_url:
+                    description: presigned upload url that expires after 1 hour
+                    type: string
+                    example: http://your-upload-url
+  /blobs/{blobId}:
+    get:
+      description: Retrieves recognized labels of the image using blob_id from DynamoDB table
+      parameters:
+        - in: path
+          name: blobId
+          schema:
+            type: integer
+          required: true
+          description: corresponding key to the DynamoDB table in order to retrieve labels
+      responses:
+        '200':
+          description: Found labels using the blob_id like dynamoDB key
+          content:
+            application/json:
+              type: object
+              description: Response object with labels and result.
+              properties:
+                id:
+                  type: string
+                  description: blob_id identifier.
+                  example: 2531329f-fb09-4ef7-887e-84e648214436
+                result:
+                  type: string
+                  description: result of the searching operation into dynamoDB.
+                labels:
+                  type: array
+                  description: labels saved and recognized from the processed image
+        '400':
+          description: wrong request, blob_id is missing from the body
+          content:
+            application/json:
+              schema:
+                required:
+                  - error
+                properties:
+                  error:
+                    description: blob_id is missing
+                    type: string
+                    example: blob id is missing
+        '404':
+          description: object with this blob_id not found into the DynamoDB
+          content:
+            application/json:
+              schema:
+                required:
+                  - blob_id
+                properties:
+                  blob_id:
+                    description: blob_id not found into the DynamoDB
+                    type: string
+                    example: Item not found
+                    
